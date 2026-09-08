@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/predict.py": {
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    { "src": "/api/predict", "dest": "/api/predict.py" }
+  ]
+}
