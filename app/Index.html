@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מודל חיזוי מלחמות בישראל (1948-2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Heebo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-red-500 selection:text-white">
+
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-base font-bold text-white tracking-tight">מודל חיזוי עימותים ישראל (1948-2026)</h1>
+            <div class="text-xs text-slate-400">ניתוח סטטיסטי-היסטורי</div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 flex flex-col items-center justify-center">
+        <div class="text-center max-w-2xl mb-8">
+            <h2 class="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tight">מתי תפרוץ המלחמה הבאה?</h2>
+            <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
+                המודל משכלל נתונים היסטוריים מכל מערכות ישראל מאז 1948 ועד 2026 ישירות מתוך מסד הנתונים באמצעות רגרסיה ליניארית.
+            </p>
+        </div>
+
+        <div class="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+            <div id="controlPanel" class="flex flex-col items-center">
+                <button onclick="runPrediction()" class="group relative w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-black text-xl rounded-2xl shadow-xl shadow-red-950/50 border border-red-400/30 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex items-center justify-center gap-3">
+                    <span class="text-2xl">🎯</span>
+                    <span>הפעל מנוע חיזוי מלחמה עכשיו</span>
+                </button>
+            </div>
+
+            <div id="loadingState" class="hidden flex-col items-center justify-center py-12">
+                <div class="w-16 h-16 mb-4 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
+                <div id="loadingStatusText" class="text-sm font-semibold text-slate-300 animate-pulse">שולף נתונים מ-Supabase ומחשב רגרסיה...</div>
+            </div>
+
+            <div id="resultState" class="hidden flex-col items-center text-center py-4">
+                <div class="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 text-3xl mb-4">⚠️</div>
+                <h3 id="resultDate" class="text-3xl sm:text-5xl font-black text-white my-3 tracking-tight"></h3>
+                <p id="resultDescription" class="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-6 leading-relaxed"></p>
+                <button onclick="resetPrediction()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl border border-slate-700 cursor-pointer">🔄 בצע חישוב מחדש</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // הכנס כאן את כתובת ה-Supabase ואת מפתח ה-Anon שלך
+        const SUPABASE_URL = "הכנס_כאן_כתובת_סופאבייס";
+        const SUPABASE_ANON_KEY = "הכנס_כאן_מפתח_אנונימי";
+
+        window.runPrediction = async function() {
+            document.getElementById('controlPanel').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/conflicts_dataset?select=*`, {
+                    headers: {
+                        "apikey": SUPABASE_ANON_KEY,
+                        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const n = data.length;
+                    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+                    let totalInterval = 0;
+
+                    data.forEach((row, index) => {
+                        sumX += index;
+                        sumY += row.event_year;
+                        sumXY += (index * row.event_year);
+                        sumXX += (index * index);
+                        totalInterval += row.time_interval;
+                    });
+
+                    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                    const intercept = (sumY - slope * sumX) / n;
+                    const predictedYearFloat = slope * n + intercept;
+                    
+                    const baseYear = Math.floor(predictedYearFloat);
+                    const fraction = predictedYearFloat - baseYear;
+                    const predictedDate = new Date(baseYear, 0, 1);
+                    predictedDate.setTime(predictedDate.getTime() + fraction * 365.25 * 24 * 60 * 60 * 1000);
+                    
+                    const formattedDateStr = predictedDate.toLocaleDateString('he-IL', { year: 'numeric', month: 'long' });
+                    const meanInterval = (totalInterval / n).toFixed(1);
+
+                    document.getElementById('resultDate').textContent = `חודש ${formattedDateStr}`;
+                    document.getElementById('resultDescription').textContent = 
+                        `המודל ניתח ${n} אירועים היסטוריים מ-1948 ועד 2026 באמצעות רגרסיה ליניארית. מרווח הזמן הממוצע עומד על ${meanInterval} שנים.`;
+                } else {
+                    document.getElementById('resultDate').textContent = "שגיאה בנתונים";
+                    document.getElementById('resultDescription').textContent = "לא נמצאו נתונים תקינים במסד הנתונים.";
+                }
+            } catch (err) {
+                document.getElementById('resultDate').textContent = "שגיאת תקשורת";
+                document.getElementById('resultDescription').textContent = "לא הצליח להתחבר למסד הנתונים ב-Supabase.";
+            }
+
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('resultState').classList.remove('hidden');
+            document.getElementById('resultState').classList.add('flex');
+        };
+
+        window.resetPrediction = function() {
+            document.getElementById('resultState').classList.add('hidden');
+            document.getElementById('resultState').classList.remove('flex');
+            document.getElementById('controlPanel').classList.remove('hidden');
+        };
+    </script>
+</body>
+</html>
