@@ -12,7 +12,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-red-500 selection:text-white">
 
-    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <header class="bg-slate-900/85 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-base font-bold text-white tracking-tight">מודל חיזוי עימותים ישראל (1948-2026)</h1>
             <div class="text-xs text-slate-400">ניתוח סטטיסטי-היסטורי</div>
@@ -23,11 +23,12 @@
         <div class="text-center max-w-2xl mb-8">
             <h2 class="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tight">מתי תפרוץ המלחמה הבאה?</h2>
             <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
-                המודל משכלל נתונים היסטוריים מכל מערכות ישראל מאז 1948 ועד 2026 ישירות מתוך מסד הנתונים באמצעות רגרסיה ליניארית.
+                המודל משכלל נתונים היסטוריים מכל מערכות ישראל מאז 1948 ועד 2026 באמצעות רגרסיה ליניארית מדויקת מול מסד הנתונים.
             </p>
         </div>
 
         <div class="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+            
             <div id="controlPanel" class="flex flex-col items-center">
                 <button onclick="runPrediction()" class="group relative w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-black text-xl rounded-2xl shadow-xl shadow-red-950/50 border border-red-400/30 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex items-center justify-center gap-3">
                     <span class="text-2xl">🎯</span>
@@ -35,31 +36,39 @@
                 </button>
             </div>
 
+            <!-- Loading State -->
             <div id="loadingState" class="hidden flex-col items-center justify-center py-12">
                 <div class="w-16 h-16 mb-4 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
-                <div id="loadingStatusText" class="text-sm font-semibold text-slate-300 animate-pulse">שולף נתונים מ-Supabase ומחשב רגרסיה...</div>
+                <div class="text-sm font-semibold text-slate-300 animate-pulse">שולף נתונים מ-Supabase ומחשב רגרסיה...</div>
             </div>
 
+            <!-- Result State -->
             <div id="resultState" class="hidden flex-col items-center text-center py-4">
                 <div class="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 text-3xl mb-4">⚠️</div>
                 <h3 id="resultDate" class="text-3xl sm:text-5xl font-black text-white my-3 tracking-tight"></h3>
                 <p id="resultDescription" class="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-6 leading-relaxed"></p>
                 <button onclick="resetPrediction()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl border border-slate-700 cursor-pointer">🔄 בצע חישוב מחדש</button>
             </div>
+
         </div>
     </main>
 
+    <footer class="bg-slate-900/50 border-t border-slate-800 text-center py-4 text-xs text-slate-500">
+        <p>מודל חיזוי סטטיסטי מתקדם • כל הזכויות שמורות © 2026</p>
+    </footer>
+
     <script>
-        // הכנס כאן את כתובת ה-Supabase ואת מפתח ה-Anon שלך
-        const SUPABASE_URL = "הכנס_כאן_כתובת_סופאבייס";
-        const SUPABASE_ANON_KEY = "הכנס_כאן_מפתח_אנונימי";
+        // חיבור ישיר מול ה-DB עם המפתחות שהגדרת
+        const SUPABASE_URL = "https://fzvanftooiqaakuinlez.supabase.co/rest/v1";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dmFuZnRvb2lxYWFrdWlubGV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NjgwNDYsImV4cCI6MjEwNDQ0NDA0Nn0.GWyJVyQ54U4H65R-c4BhOXDEWOfJetY-MtPpwOuvPCs";
 
         window.runPrediction = async function() {
             document.getElementById('controlPanel').classList.add('hidden');
             document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('resultState').classList.add('hidden');
 
             try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/conflicts_dataset?select=*`, {
+                const response = await fetch(`${SUPABASE_URL}/conflicts_dataset?select=*`, {
                     headers: {
                         "apikey": SUPABASE_ANON_KEY,
                         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
@@ -69,6 +78,7 @@
                 const data = await response.json();
 
                 if (data && data.length > 0) {
+                    // חישוב רגרסיה ליניארית מדויקת
                     const n = data.length;
                     let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
                     let totalInterval = 0;
@@ -78,7 +88,7 @@
                         sumY += row.event_year;
                         sumXY += (index * row.event_year);
                         sumXX += (index * index);
-                        totalInterval += row.time_interval;
+                        totalInterval += (row.time_interval || 0);
                     });
 
                     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
@@ -95,12 +105,13 @@
 
                     document.getElementById('resultDate').textContent = `חודש ${formattedDateStr}`;
                     document.getElementById('resultDescription').textContent = 
-                        `המודל ניתח ${n} אירועים היסטוריים מ-1948 ועד 2026 באמצעות רגרסיה ליניארית. מרווח הזמן הממוצע עומד על ${meanInterval} שנים.`;
+                        `המודל ניתח ${n} אירועים היסטוריים מ-1948 ועד 2026 באמצעות רגרסיה ליניארית מתקדמת. מרווח הזמן הממוצע עומד על ${meanInterval} שנים.`;
                 } else {
                     document.getElementById('resultDate').textContent = "שגיאה בנתונים";
-                    document.getElementById('resultDescription').textContent = "לא נמצאו נתונים תקינים במסד הנתונים.";
+                    document.getElementById('resultDescription').textContent = "לא נמצאו נתונים תקינים בטבלת המסד.";
                 }
             } catch (err) {
+                console.error(err);
                 document.getElementById('resultDate').textContent = "שגיאת תקשורת";
                 document.getElementById('resultDescription').textContent = "לא הצליח להתחבר למסד הנתונים ב-Supabase.";
             }
